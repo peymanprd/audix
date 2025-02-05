@@ -104,11 +104,11 @@ const createAudix = () => {
     loop: boolean = false,
     startTime?: number
   ): void => {
-    const context = getOrCreateAudioContext();
-
+    
     const audioBuffer = audioBuffers.get(name);
     if (!audioBuffer) throw new Error(`Audio "${name}" not found.`);
-
+    
+    const context = getOrCreateAudioContext();
     const source = context.createBufferSource();
     source.buffer = audioBuffer;
     source.loop = loop;
@@ -273,8 +273,8 @@ const createAudix = () => {
    * Clean up resources and stop all audio playback.
    */
   const dispose = (): void => {
-    const context = getOrCreateAudioContext();
     audioSources.forEach(({ source }) => source.stop());
+    const context = getOrCreateAudioContext();
     context.close();
     audioContext = null;
     audioSources.clear();
