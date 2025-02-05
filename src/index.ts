@@ -210,6 +210,19 @@ const createAudix = () => {
   };
 
   /**
+   * Set the playback rate of the audio.
+   * @param name - The name of the audio file.
+   * @param rate - The playback rate (1.0 is normal speed).
+   */
+  const setPlaybackRate = (name: string, rate: number): void => {
+    const audioSource = audioSources.get(name);
+    if (!audioSource) return;
+
+    const { source } = audioSource;
+    source.playbackRate.value = rate;
+  };
+
+  /**
    * Add an event listener for a specific audio event.
    * @param event - The event type ('play', 'pause', 'end', 'error').
    * @param name - The name of the audio file.
@@ -258,6 +271,7 @@ const createAudix = () => {
     seek,
     getCurrentTime,
     setVolume,
+    setPlaybackRate,
     on,
     off,
     dispose,
