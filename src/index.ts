@@ -16,6 +16,11 @@
  */
 
 type AudioEvent = "play" | "pause" | "end" | "error";
+type AudioEventData = {
+  name: string;
+  currentTime?: number;
+  error?: Error;
+};
 type AudioSource = {
   source: AudioBufferSourceNode;
   startTime: number;
@@ -47,11 +52,19 @@ const createAudix = () => {
    * @param event - The event type ('play', 'pause', 'end', 'error').
    * @param name - The name of the audio file.
    */
-  const emitEvent = (event: AudioEvent, name: string): void => {
+  const emitEvent = (
+    event: AudioEvent,
+    name: string,
+    data?: Omit<AudioEventData, "name">
+  ): void => {
     const eventMap = eventListeners.get(event);
     if (eventMap) {
       const listeners = eventMap.get(name);
-      if (listeners) listeners.forEach((listener) => listener());
+      if (listeners) {
+        listeners.forEach((listener: (payload: AudioEventData) => void) =>
+          listener({ name, ...data })
+        );
+      }
     }
   };
 
@@ -71,10 +84,12 @@ const createAudix = () => {
       const audioBuffer = await context.decodeAudioData(arrayBuffer);
       audioBuffers.set(name, audioBuffer);
     } catch (error) {
-      emitEvent("error", name);
-      if (error instanceof Error) {
-        throw new Error(`Failed to load audio "${name}": ${error.message}`);
-      }
+      emitEvent("error", name, {
+        error:
+          error instanceof Error
+            ? error
+            : new Error(`Failed to load audio "${name}": ${error}`),
+      });
     }
   };
 
@@ -108,12 +123,12 @@ const createAudix = () => {
       offset: playbackTime,
     });
 
-    emitEvent("play", name);
+    emitEvent("play", name, { currentTime: playbackTime });
 
     source.onended = () => {
       audioSources.delete(name);
       playbackTimes.delete(name);
-      emitEvent("end", name);
+      emitEvent("end", name, { currentTime: source.buffer?.duration ?? 0 });
     };
   };
 
@@ -131,7 +146,7 @@ const createAudix = () => {
     playbackTimes.set(name, currentTime);
     source.stop();
     audioSources.delete(name);
-    emitEvent("pause", name);
+    emitEvent("pause", name, { currentTime });
   };
 
   /**
@@ -146,7 +161,7 @@ const createAudix = () => {
     source.stop();
     audioSources.delete(name);
     playbackTimes.delete(name);
-    emitEvent("end", name);
+    emitEvent("end", name, { currentTime: 0 });
   };
 
   /**
