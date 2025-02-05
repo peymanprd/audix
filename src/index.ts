@@ -32,7 +32,16 @@ const createAudix = () => {
   let audioSources: Map<string, AudioSource> = new Map();
   let playbackTimes: Map<string, number> = new Map();
   let eventListeners: Map<string, Map<string, Set<() => void>>> = new Map();
-
+  /**
+   * Get or create an audio context.
+   * @returns The audio context.
+   */
+  const getOrCreateAudioContext = () => {
+    if (!audioContext || audioContext.state === "closed") {
+      audioContext = new AudioContext();
+    }
+    return audioContext;
+  };
   /**
    * Emit an event for a specific audio file.
    * @param event - The event type ('play', 'pause', 'end', 'error').
@@ -52,12 +61,12 @@ const createAudix = () => {
    * @param url - The URL of the audio file.
    */
   const load = async (name: string, url: string): Promise<void> => {
-    if (!audioContext) return;
+    const context = getOrCreateAudioContext();
 
     try {
       const response = await fetch(url);
       const arrayBuffer = await response.arrayBuffer();
-      const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+      const audioBuffer = await context.decodeAudioData(arrayBuffer);
       audioBuffers.set(name, audioBuffer);
     } catch (error) {
       emitEvent("error", name);
@@ -76,22 +85,22 @@ const createAudix = () => {
     loop: boolean = false,
     startTime?: number
   ): void => {
-    if (!audioContext) return;
+    const context = getOrCreateAudioContext();
 
     const audioBuffer = audioBuffers.get(name);
     if (!audioBuffer) return console.error(`Audio "${name}" not found.`);
 
-    const source = audioContext.createBufferSource();
+    const source = context.createBufferSource();
     source.buffer = audioBuffer;
     source.loop = loop;
-    source.connect(audioContext.destination);
+    source.connect(context.destination);
 
     const playbackTime = startTime ?? playbackTimes.get(name) ?? 0;
     source.start(0, playbackTime);
 
     audioSources.set(name, {
       source,
-      startTime: audioContext.currentTime,
+      startTime: context.currentTime,
       offset: playbackTime,
     });
 
@@ -110,10 +119,11 @@ const createAudix = () => {
    */
   const pause = (name: string): void => {
     const audioSource = audioSources.get(name);
-    if (!audioSource || !audioContext) return;
+    if (!audioSource) return;
 
     const { source, startTime, offset } = audioSource;
-    const currentTime = audioContext.currentTime - startTime + offset;
+    const context = getOrCreateAudioContext();
+    const currentTime = context.currentTime - startTime + offset;
     playbackTimes.set(name, currentTime);
     source.stop();
     audioSources.delete(name);
@@ -154,9 +164,10 @@ const createAudix = () => {
    */
   const getCurrentTime = (name: string): number => {
     const audioSource = audioSources.get(name);
-    if (audioSource && audioContext) {
+    if (audioSource) {
       const { startTime, offset } = audioSource;
-      return audioContext.currentTime - startTime + offset;
+      const context = getOrCreateAudioContext();
+      return context.currentTime - startTime + offset;
     }
     return playbackTimes.get(name) ?? 0;
   };
@@ -168,14 +179,15 @@ const createAudix = () => {
    */
   const setVolume = (name: string, volume: number): void => {
     const audioSource = audioSources.get(name);
-    if (!audioSource || !audioContext) return;
+    if (!audioSource) return;
 
     const { source } = audioSource;
-    const gainNode = audioContext.createGain();
+    const context = getOrCreateAudioContext();
+    const gainNode = context.createGain();
     gainNode.gain.value = volume;
     source.disconnect();
     source.connect(gainNode);
-    gainNode.connect(audioContext.destination);
+    gainNode.connect(context.destination);
   };
 
   /**
@@ -209,11 +221,10 @@ const createAudix = () => {
    * Clean up resources and stop all audio playback.
    */
   const dispose = (): void => {
-    if (audioContext) {
-      audioSources.forEach(({ source }) => source.stop());
-      audioContext.close();
-      audioContext = null;
-    }
+    const context = getOrCreateAudioContext();
+    audioSources.forEach(({ source }) => source.stop());
+    context.close();
+    audioContext = null;
     audioSources.clear();
     audioBuffers.clear();
     playbackTimes.clear();
