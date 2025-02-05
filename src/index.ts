@@ -15,7 +15,7 @@
  * Version: 1.0.0
  */
 
-type AudioEvent = "play" | "pause" | "end" | "error";
+type AudioEvent = "play" | "pause" | "end" | "error" | "loaded";
 type AudioEventData = {
   name: string;
   currentTime?: number;
@@ -31,12 +31,31 @@ type AudioSource = {
  * Create an instance of Audix.
  * @returns An object containing methods to manage audio playback.
  */
-const createAudix = () => {
+const createAudix = (options: { useWorker?: boolean } = {}) => {
+  const { useWorker = false } = options;
+  let worker: Worker | null = null;
   let audioContext: AudioContext | null = new AudioContext();
   let audioBuffers: Map<string, AudioBuffer> = new Map();
   let audioSources: Map<string, AudioSource> = new Map();
   let playbackTimes: Map<string, number> = new Map();
   let eventListeners: Map<string, Map<string, Set<() => void>>> = new Map();
+
+  // Check if worker option is enabled
+  if (useWorker) {
+    // Then create a new worker
+    worker = new Worker(new URL("./worker.js", document.baseURI));
+    // And listen for messages from the worker
+    worker.onmessage = (event) => {
+      const { name, audioBuffer, error } = event.data;
+      if (error) {
+        emitEvent("error", name, { error });
+      } else {
+        audioBuffers.set(name, audioBuffer);
+        emitEvent("loaded", name);
+      }
+    };
+  }
+
   /**
    * Get or create an audio context.
    * @returns The audio context.
@@ -74,22 +93,26 @@ const createAudix = () => {
    * @param url - The URL of the audio file.
    */
   const load = async (name: string, url: string): Promise<void> => {
-    try {
-      const response = await fetch(url);
-      if (!response.ok) {
-        throw new Error(`Failed to fetch audio: ${response.statusText}`);
+    if (useWorker && worker) {
+      worker.postMessage({ name, url });
+    } else {
+      try {
+        const response = await fetch(url);
+        if (!response.ok) {
+          throw new Error(`Failed to fetch audio: ${response.statusText}`);
+        }
+        const arrayBuffer = await response.arrayBuffer();
+        const context = getOrCreateAudioContext();
+        const audioBuffer = await context.decodeAudioData(arrayBuffer);
+        audioBuffers.set(name, audioBuffer);
+      } catch (error) {
+        emitEvent("error", name, {
+          error:
+            error instanceof Error
+              ? error
+              : new Error(`Failed to load audio "${name}": ${error}`),
+        });
       }
-      const arrayBuffer = await response.arrayBuffer();
-      const context = getOrCreateAudioContext();
-      const audioBuffer = await context.decodeAudioData(arrayBuffer);
-      audioBuffers.set(name, audioBuffer);
-    } catch (error) {
-      emitEvent("error", name, {
-        error:
-          error instanceof Error
-            ? error
-            : new Error(`Failed to load audio "${name}": ${error}`),
-      });
     }
   };
 
@@ -287,6 +310,12 @@ const createAudix = () => {
     const context = getOrCreateAudioContext();
     context.close();
     audioContext = null;
+
+    if (worker) {
+      worker.terminate(); // terminate the worker if it exists
+      worker = null;
+    }
+
     // remove unused audio files with unload function
     Array.from(audioBuffers.keys()).forEach(unload);
   };
