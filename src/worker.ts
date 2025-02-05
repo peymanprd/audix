@@ -2,20 +2,26 @@
  * Interface for the message sent from the main thread to the worker
  * @url - The URL of the audio file
  * @name - The name of the audio file
- * @audioBuffer - The decoded audio buffer
- * @error - The error message
  */
 interface WorkerMessage {
   url: string;
   name: string;
 }
-
+/**
+ * Interface for the message sent from the worker to the main thread
+ * @name - The name of the audio file
+ * @audioBuffer - The decoded audio buffer
+ * @error - The error message
+ */
 interface WorkerResponse {
   name: string;
   audioBuffer?: AudioBuffer;
   error?: string;
 }
-
+/**
+ * Event listener for messages sent from the main thread
+ * @param event - The message event
+ */
 self.addEventListener("message", async (event: MessageEvent<WorkerMessage>) => {
   // Extract the URL and name from the message
   const { url, name } = event.data;
