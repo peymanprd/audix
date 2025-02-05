@@ -61,16 +61,20 @@ const createAudix = () => {
    * @param url - The URL of the audio file.
    */
   const load = async (name: string, url: string): Promise<void> => {
-    const context = getOrCreateAudioContext();
-
     try {
       const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch audio: ${response.statusText}`);
+      }
       const arrayBuffer = await response.arrayBuffer();
+      const context = getOrCreateAudioContext();
       const audioBuffer = await context.decodeAudioData(arrayBuffer);
       audioBuffers.set(name, audioBuffer);
     } catch (error) {
       emitEvent("error", name);
-      console.error(`Failed to load audio "${name}":`, error);
+      if (error instanceof Error) {
+        throw new Error(`Failed to load audio "${name}": ${error.message}`);
+      }
     }
   };
 
@@ -88,7 +92,7 @@ const createAudix = () => {
     const context = getOrCreateAudioContext();
 
     const audioBuffer = audioBuffers.get(name);
-    if (!audioBuffer) return console.error(`Audio "${name}" not found.`);
+    if (!audioBuffer) throw new Error(`Audio "${name}" not found.`);
 
     const source = context.createBufferSource();
     source.buffer = audioBuffer;
