@@ -104,10 +104,9 @@ const createAudix = () => {
     loop: boolean = false,
     startTime?: number
   ): void => {
-    
     const audioBuffer = audioBuffers.get(name);
     if (!audioBuffer) throw new Error(`Audio "${name}" not found.`);
-    
+
     const context = getOrCreateAudioContext();
     const source = context.createBufferSource();
     source.buffer = audioBuffer;
@@ -270,6 +269,17 @@ const createAudix = () => {
   };
 
   /**
+   * Unload an audio files and stop its playback.
+   * @param name - The name of the audio file to unload.
+   */
+  const unload = (name: string): void => {
+    if (audioSources.has(name)) stop(name);
+    audioBuffers.delete(name);
+    playbackTimes.delete(name);
+    eventListeners.forEach((eventMap) => eventMap.delete(name));
+  };
+
+  /**
    * Clean up resources and stop all audio playback.
    */
   const dispose = (): void => {
@@ -277,10 +287,8 @@ const createAudix = () => {
     const context = getOrCreateAudioContext();
     context.close();
     audioContext = null;
-    audioSources.clear();
-    audioBuffers.clear();
-    playbackTimes.clear();
-    eventListeners.clear();
+    // remove unused audio files with unload function
+    Array.from(audioBuffers.keys()).forEach(unload);
   };
 
   return {
