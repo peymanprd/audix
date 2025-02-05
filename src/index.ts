@@ -223,6 +223,26 @@ const createAudix = () => {
   };
 
   /**
+   * Add an effect to the audio.
+   * @param name - The name of the audio file.
+   * @param effect - The effect function.
+   */
+  const addEffect = (
+    name: string,
+    effect: (context: AudioContext) => AudioNode
+  ): void => {
+    const audioSource = audioSources.get(name);
+    if (!audioSource) return;
+
+    const { source } = audioSource;
+    const context = getOrCreateAudioContext();
+    const effectNode = effect(context);
+    source.disconnect();
+    source.connect(effectNode);
+    effectNode.connect(context.destination);
+  };
+
+  /**
    * Add an event listener for a specific audio event.
    * @param event - The event type ('play', 'pause', 'end', 'error').
    * @param name - The name of the audio file.
@@ -272,6 +292,7 @@ const createAudix = () => {
     getCurrentTime,
     setVolume,
     setPlaybackRate,
+    addEffect,
     on,
     off,
     dispose,
