@@ -7,7 +7,7 @@
  * - Playing, pausing, stopping, and seeking audio.
  * - Managing multiple audio instances.
  * - Applying volume control.
- * - Handling audio events (play, pause, end, error).
+ * - Handling audio events (play, pause, end, error, loaded).
  *
  * Built with TypeScript and the Web Audio API, Audix is type-safe and easy to integrate into any project.
  *
